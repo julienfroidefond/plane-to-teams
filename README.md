@@ -77,6 +77,21 @@ Le service va :
 - Si le service démarre après l'heure configurée et qu'aucune notification n'a été envoyée aujourd'hui, une synchronisation immédiate sera effectuée
 - Les états de synchronisation sont stockés dans `.state.json`
 
+### Synchronisation manuelle
+
+Pour forcer une synchronisation sans attendre l'heure planifiée, vous pouvez utiliser le script de synchronisation manuelle :
+
+```bash
+python -m plane_to_teams.manual_sync
+```
+
+Ce script va :
+
+- Charger la configuration depuis le fichier `.env`
+- Initialiser les clients Plane et Teams
+- Forcer une synchronisation immédiate, indépendamment de l'heure
+- Les résultats seront visibles dans les logs et dans Teams
+
 ### État du Service
 
 Le fichier `.state.json` contient :
