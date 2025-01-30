@@ -129,6 +129,80 @@ Pour lancer les tests avec la couverture :
 python -m pytest --cov=plane_to_teams
 ```
 
+## Utilisation avec Docker
+
+### Prérequis
+
+- Docker
+- Docker Compose
+
+### Installation avec Docker
+
+1. Construire l'image :
+
+```bash
+docker-compose build
+```
+
+2. Démarrer le conteneur :
+
+```bash
+docker-compose up -d
+```
+
+Le service sera automatiquement redémarré en cas d'erreur grâce à la politique `restart: unless-stopped`.
+
+### Logs Docker
+
+Les logs sont disponibles dans le dossier `logs` monté en volume :
+
+```bash
+tail -f logs/plane_to_teams.log
+```
+
+Ou via Docker :
+
+```bash
+docker-compose logs -f
+```
+
+### État du Service dans Docker
+
+Le fichier d'état `.state.json` est persisté dans le dossier `state` monté en volume.
+
+### Arrêt du Service
+
+Pour arrêter le service :
+
+```bash
+docker-compose down
+```
+
+### Mise à jour
+
+Pour mettre à jour le service avec une nouvelle version :
+
+```bash
+docker-compose pull  # Si l'image est sur un registry
+docker-compose up -d --build  # Pour reconstruire l'image locale
+```
+
+### Santé du Conteneur
+
+Le conteneur inclut un healthcheck qui vérifie la présence et l'accès aux logs toutes les minutes.
+Vous pouvez vérifier l'état du conteneur avec :
+
+```bash
+docker ps
+```
+
+### Sécurité
+
+- Le conteneur s'exécute avec un utilisateur non-root (planeuser)
+- Les secrets sont gérés via le fichier .env
+- L'image est basée sur une version slim de Python pour minimiser la surface d'attaque
+- Les dépendances sont régulièrement mises à jour
+
 ## Structure du Projet
 
 ```
