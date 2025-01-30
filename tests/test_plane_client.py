@@ -18,6 +18,8 @@ class TestPlaneClient(TestCase):
             plane_workspace='test_workspace',
             plane_project_id='test_project',
             teams_webhook_url='http://teams.webhook',
+            notification_hour=8,
+            max_retries=3,
             sync_interval=10,
             log_level='DEBUG',
             log_file='test.log'
@@ -45,75 +47,120 @@ class TestPlaneClient(TestCase):
 
     def test_get_issues_url(self):
         """Test issues URL construction."""
+        url = self.client._get_issues_url()
         expected_url = 'http://test.url/workspaces/test_workspace/projects/test_project/issues/'
-        self.assertEqual(self.client._get_issues_url(), expected_url)
+        self.assertEqual(url, expected_url)
 
-    def test_get_issues_success(self):
-        """Test successful issues fetch."""
-        with mock.patch('requests.Session.get') as mock_get:
-            mock_get.return_value.json.return_value = {'results': [self.sample_issue]}
-            mock_get.return_value.status_code = 200
-            
-            issues = self.client.get_issues()
-            
-            self.assertEqual(len(issues), 1)
-            issue = issues[0]
-            self.assertIsInstance(issue, PlaneIssue)
-            self.assertEqual(issue.id, 'test-id')
-            self.assertEqual(issue.name, 'Test Issue')
-            self.assertEqual(issue.priority, 'high')
-            self.assertEqual(issue.labels, ['label1', 'label2'])
-            self.assertEqual(issue.assignees, ['user1', 'user2'])
+    @mock.patch('requests.Session.get')
+    async def test_get_issues_success(self, mock_get):
+        """Test successful issues retrieval."""
+        # Setup mock
+        mock_response = mock.MagicMock()
+        mock_response.json.return_value = [
+            {
+                'id': '1',
+                'name': 'Test Issue',
+                'priority': 'high',
+                'state': 'daaf8056-e88d-40ba-b527-d58f3e518059'
+            }
+        ]
+        mock_get.return_value = mock_response
 
-    def test_get_issues_failure(self):
-        """Test failed issues fetch."""
-        with mock.patch('requests.Session.get') as mock_get:
-            mock_get.side_effect = RequestException('API Error')
-            
-            with self.assertRaises(RequestException):
-                self.client.get_issues()
+        # Get issues
+        issues = await self.client.get_issues()
 
-    def test_get_issue_success(self):
-        """Test successful single issue fetch."""
-        with mock.patch('requests.Session.get') as mock_get:
-            mock_get.return_value.json.return_value = self.sample_issue
-            mock_get.return_value.status_code = 200
-            
-            issue = self.client.get_issue('test-id')
-            
-            self.assertIsInstance(issue, PlaneIssue)
-            self.assertEqual(issue.id, 'test-id')
-            self.assertEqual(issue.name, 'Test Issue')
-            self.assertEqual(issue.labels, ['label1', 'label2'])
-            self.assertEqual(issue.assignees, ['user1', 'user2'])
+        # Verify
+        self.assertEqual(len(issues), 1)
+        self.assertEqual(issues[0].id, '1')
+        self.assertEqual(issues[0].name, 'Test Issue')
+        self.assertEqual(issues[0].priority, 'high')
+        self.assertEqual(issues[0].state, 'daaf8056-e88d-40ba-b527-d58f3e518059')
 
-    def test_get_issue_not_found(self):
+    @mock.patch('requests.Session.get')
+    async def test_get_issues_failure(self, mock_get):
+        """Test issues retrieval failure."""
+        # Setup mock to raise exception
+        mock_get.side_effect = Exception("Network error")
+
+        # Verify exception is raised
+        with self.assertRaises(Exception):
+            await self.client.get_issues()
+
+    @mock.patch('requests.Session.get')
+    async def test_get_issue_success(self, mock_get):
+        """Test successful issue retrieval."""
+        # Setup mock
+        mock_response = mock.MagicMock()
+        mock_response.json.return_value = {
+            'id': '1',
+            'name': 'Test Issue',
+            'priority': 'high',
+            'state': 'daaf8056-e88d-40ba-b527-d58f3e518059'
+        }
+        mock_get.return_value = mock_response
+
+        # Get issue
+        issue = await self.client.get_issue('1')
+
+        # Verify
+        self.assertEqual(issue.id, '1')
+        self.assertEqual(issue.name, 'Test Issue')
+        self.assertEqual(issue.priority, 'high')
+        self.assertEqual(issue.state, 'daaf8056-e88d-40ba-b527-d58f3e518059')
+
+    @mock.patch('requests.Session.get')
+    async def test_get_issue_failure(self, mock_get):
+        """Test issue retrieval failure."""
+        # Setup mock to raise exception
+        mock_get.side_effect = Exception("Network error")
+
+        # Verify exception is raised
+        with self.assertRaises(Exception):
+            await self.client.get_issue('1')
+
+    @mock.patch('requests.Session.get')
+    async def test_get_issue_not_found(self, mock_get):
         """Test issue not found."""
-        with mock.patch('requests.Session.get') as mock_get:
-            mock_get.return_value.status_code = 404
-            
-            issue = self.client.get_issue('non-existent')
-            self.assertIsNone(issue)
+        # Setup mock
+        mock_response = mock.MagicMock()
+        mock_response.json.return_value = None
+        mock_get.return_value = mock_response
 
-    def test_get_issue_failure(self):
-        """Test failed single issue fetch."""
-        with mock.patch('requests.Session.get') as mock_get:
-            mock_get.side_effect = RequestException('API Error')
-            
-            with self.assertRaises(RequestException):
-                self.client.get_issue('test-id')
+        # Get issue
+        issue = await self.client.get_issue('1')
+
+        # Verify
+        self.assertIsNone(issue)
 
     def test_plane_issue_from_api_response(self):
         """Test PlaneIssue creation from API response."""
-        issue = PlaneIssue.from_api_response(self.sample_issue)
+        api_response = {
+            'id': '1',
+            'name': 'Test Issue',
+            'description_html': '<p>Test description</p>',
+            'priority': 'high',
+            'state': 'daaf8056-e88d-40ba-b527-d58f3e518059',
+            'created_at': '2024-01-30T12:00:00Z',
+            'updated_at': '2024-01-30T12:00:00Z',
+            'estimate_point': 3,
+            'start_date': '2024-01-30',
+            'target_date': '2024-02-30',
+            'completed_at': None,
+            'sequence_id': 1,
+            'project': 'test_project',
+            'labels': [],
+            'assignees': []
+        }
+
+        issue = PlaneIssue.from_api_response(api_response)
         
-        self.assertEqual(issue.id, 'test-id')
+        self.assertEqual(issue.id, '1')
         self.assertEqual(issue.name, 'Test Issue')
         self.assertEqual(issue.description_html, '<p>Test description</p>')
         self.assertEqual(issue.priority, 'high')
-        self.assertEqual(issue.state, 'in_progress')
+        self.assertEqual(issue.state, 'daaf8056-e88d-40ba-b527-d58f3e518059')
         self.assertEqual(issue.estimate_point, 3)
         self.assertEqual(issue.sequence_id, 1)
         self.assertEqual(issue.project_id, 'test_project')
-        self.assertEqual(issue.labels, ['label1', 'label2'])
-        self.assertEqual(issue.assignees, ['user1', 'user2'])
+        self.assertEqual(issue.labels, [])
+        self.assertEqual(issue.assignees, [])

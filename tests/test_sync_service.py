@@ -155,7 +155,7 @@ async def test_sync_max_retries(sync_service, mock_plane_client):
     
 def test_start_scheduler(sync_service):
     """Test du démarrage du scheduler."""
-    with patch('apscheduler.schedulers.background.BackgroundScheduler.add_job') as mock_add_job:
+    with patch('apscheduler.schedulers.asyncio.AsyncIOScheduler.add_job') as mock_add_job:
         sync_service.start()
         
         # Vérifier que le job quotidien a été ajouté
