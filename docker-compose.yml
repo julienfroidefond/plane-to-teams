@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  plane-to-teams:
+    build: .
+    image: plane-to-teams:latest
+    container_name: plane-to-teams
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - TZ=Europe/Paris
+    volumes:
+      - ./logs:/app/logs
+      - ./state:/app/state
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import sys; sys.exit(0 if open('/app/logs/plane_to_teams.log', 'r').read() else 1)",
+        ]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 30s
