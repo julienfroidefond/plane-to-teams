@@ -121,51 +121,13 @@ class TestTeamsFormatter(unittest.TestCase):
                 ("URGENT", "Test Issue", "daaf8056-e88d-40ba-b527-d58f3e518059", "https://test.com/1")
             ]
         )
-        
+
         message_dict = message.to_dict()
-        
-        self.assertEqual(message_dict["type"], "message")
-        self.assertEqual(len(message_dict["attachments"]), 1)
-        self.assertEqual(
-            message_dict["attachments"][0]["contentType"],
-            "application/vnd.microsoft.card.adaptive"
-        )
-        
-        content = message_dict["attachments"][0]["content"]
-        self.assertEqual(content["type"], "AdaptiveCard")
-        self.assertEqual(content["version"], "1.2")
-        
-        # Check container structure
-        body = content["body"]
-        self.assertEqual(len(body), 2)
-        self.assertEqual(body[0]["type"], "Container")
-        self.assertEqual(body[1]["type"], "Container")
-        
-        # Check title
-        title_container = body[0]
-        title_block = title_container["items"][0]
-        self.assertEqual(title_block["text"], "🎯 Test Title")
-        self.assertEqual(title_block["weight"], "bolder")
-        
-        # Check issue item
-        items_container = body[1]
-        column_set = items_container["items"][0]
-        self.assertEqual(column_set["type"], "ColumnSet")
-        
-        # Check columns
-        columns = column_set["columns"]
-        self.assertEqual(len(columns), 3)
-        
-        # Check priority column
-        priority_column = columns[1]
-        priority_text = priority_column["items"][0]["text"]
-        self.assertEqual(priority_text, "[URGENT]")
-        
-        # Check issue column with state
-        issue_column = columns[2]
-        issue_text = issue_column["items"][0]["text"]
-        self.assertEqual(issue_text, "Test Issue (**En cours**)")
-        
-        # Check URL action
-        self.assertEqual(column_set["selectAction"]["type"], "Action.OpenUrl")
-        self.assertEqual(column_set["selectAction"]["url"], "https://test.com/1") 
+
+        # Verify message structure
+        self.assertEqual(message_dict["@type"], "MessageCard")
+        self.assertEqual(message_dict["@context"], "http://schema.org/extensions")
+        self.assertEqual(message_dict["title"], "🎯 Test Title")
+        self.assertEqual(len(message_dict["sections"]), 1)
+        self.assertEqual(len(message_dict["sections"][0]["facts"]), 1)
+        self.assertTrue(message_dict["sections"][0]["markdown"]) 

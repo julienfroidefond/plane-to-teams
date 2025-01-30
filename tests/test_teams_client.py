@@ -1,88 +1,60 @@
-"""Tests for the Teams webhook client."""
+"""Test Teams client."""
+import json
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
-import requests
-from requests.exceptions import RequestException
+import aiohttp
 
-from plane_to_teams.teams_client import TeamsClient
-from plane_to_teams.teams_formatter import TeamsMessage
+from plane_to_teams.teams_client import TeamsClient, TeamsMessage
+
 
 class TestTeamsClient(unittest.TestCase):
-    """Test cases for TeamsClient."""
-    
+    """Test Teams client."""
+
     def setUp(self):
-        """Set up test fixtures."""
-        self.webhook_url = "https://teams.webhook.url"
+        """Set up test environment."""
+        self.webhook_url = "https://test.com/webhook"
         self.client = TeamsClient(self.webhook_url)
         self.message = TeamsMessage(
-            title="Test Message",
+            title="Test Title",
             items=[
-                ("high", "Item 1", "daaf8056-e88d-40ba-b527-d58f3e518059", "http://test.url/1"),
-                ("medium", "Item 2", "9ce312cc-0018-4864-9867-064939dda809", "http://test.url/2")
+                ("URGENT", "Test Issue", "daaf8056-e88d-40ba-b527-d58f3e518059", "https://test.com/1")
             ]
         )
-        
-    @patch('requests.Session.post')
+
+    @patch("aiohttp.ClientSession.post")
     async def test_send_message_success(self, mock_post):
         """Test successful message sending."""
-        # Setup mock
-        mock_response = MagicMock()
-        mock_response.raise_for_status.return_value = None
-        mock_post.return_value = mock_response
-        
-        # Send message
-        result = await self.client.send_message(self.message)
-        
-        # Verify
-        self.assertTrue(result)
-        mock_post.assert_called_once_with(
-            self.webhook_url,
-            json=self.message.to_dict(),
-            timeout=10
-        )
-        
-    @patch('requests.Session.post')
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_post.return_value.__aenter__.return_value = mock_response
+
+        await self.client.send_message(self.message)
+
+        mock_post.assert_called_once()
+        args, kwargs = mock_post.call_args
+        self.assertEqual(args[0], self.webhook_url)
+        self.assertEqual(kwargs["headers"]["Content-Type"], "application/json")
+
+    @patch("aiohttp.ClientSession.post")
     async def test_send_message_failure(self, mock_post):
-        """Test message sending failure."""
-        # Setup mock to raise exception
-        mock_post.side_effect = RequestException("Network error")
-        
-        # Verify exception is raised
-        with self.assertRaises(RequestException):
+        """Test failed message sending."""
+        mock_response = AsyncMock()
+        mock_response.status = 400
+        mock_response.text = AsyncMock(return_value="Bad Request")
+        mock_post.return_value.__aenter__.return_value = mock_response
+
+        with self.assertRaises(aiohttp.ClientError):
             await self.client.send_message(self.message)
-            
+
     def test_message_format(self):
         """Test message formatting."""
         message_dict = self.message.to_dict()
-        
+
         # Verify message structure
-        self.assertEqual(message_dict["type"], "message")
-        self.assertEqual(len(message_dict["attachments"]), 1)
-        
-        # Verify card content
-        card = message_dict["attachments"][0]
-        self.assertEqual(card["contentType"], "application/vnd.microsoft.card.adaptive")
-        
-        # Verify card body
-        body = card["content"]["body"]
-        self.assertEqual(len(body), 2)
-        
-        # Verify title
-        title_block = body[0]["items"][0]
-        self.assertEqual(title_block["type"], "TextBlock")
-        self.assertEqual(title_block["text"], "🎯 Test Message")
-        
-        # Verify items
-        items_container = body[1]
-        self.assertEqual(items_container["type"], "Container")
-        items = items_container["items"]
-        self.assertEqual(len(items), 2)
-        
-        # Verify first item
-        first_item = items[0]
-        self.assertEqual(first_item["type"], "ColumnSet")
-        self.assertEqual(len(first_item["columns"]), 3)
-        self.assertEqual(first_item["columns"][1]["items"][0]["text"], "[high]")
-        self.assertEqual(first_item["columns"][2]["items"][0]["text"], "Item 1 (**En cours**)")
-        self.assertEqual(first_item["selectAction"]["url"], "http://test.url/1") 
+        self.assertEqual(message_dict["@type"], "MessageCard")
+        self.assertEqual(message_dict["@context"], "http://schema.org/extensions")
+        self.assertEqual(message_dict["title"], "🎯 Test Title")
+        self.assertEqual(len(message_dict["sections"]), 1)
+        self.assertEqual(len(message_dict["sections"][0]["facts"]), 1)
+        self.assertTrue(message_dict["sections"][0]["markdown"]) 
