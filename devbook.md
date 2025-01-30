@@ -152,3 +152,68 @@ Le fichier .state.json contient :
 - Logs détaillés pour le debugging
 - Tests unitaires complets avec mocks
 - Support des fuseaux horaires pour les notifications
+
+## Docker
+
+### 1. Conteneurisation [✓]
+
+- [x] Créer le Dockerfile
+  - [x] Utiliser Python 3.9 comme image de base
+  - [x] Installer les dépendances
+  - [x] Copier le code source
+  - [x] Configurer le point d'entrée
+- [x] Créer le docker-compose.yml
+  - [x] Définir le service principal
+  - [x] Configurer les volumes pour les logs et le state
+  - [x] Gérer les variables d'environnement
+- [x] Ajouter les scripts de build et run
+  - [x] Script de build de l'image
+  - [x] Script de démarrage du conteneur
+  - [x] Script d'arrêt du conteneur
+- [x] Documenter l'utilisation avec Docker
+  - [x] Instructions de build
+  - [x] Instructions de démarrage
+  - [x] Instructions d'arrêt
+  - [x] Gestion des logs
+  - [x] Gestion du state
+
+### 2. Configuration Docker [✓]
+
+- [x] Gérer les variables d'environnement
+  - [x] Utiliser un fichier .env
+  - [x] Supporter les variables d'environnement Docker
+  - [x] Documenter les variables requises
+- [x] Gérer les volumes
+  - [x] Volume pour les logs
+  - [x] Volume pour le state
+  - [x] Documenter les points de montage
+- [x] Gérer les timezone
+  - [x] Configurer TZ dans le conteneur
+  - [x] Documenter la configuration des timezone
+
+### 3. Sécurité Docker [✓]
+
+- [x] Bonnes pratiques de sécurité
+  - [x] Utiliser un utilisateur non-root
+  - [x] Minimiser la taille de l'image
+  - [x] Scanner les vulnérabilités
+  - [x] Mettre à jour les dépendances
+- [x] Gestion des secrets
+  - [x] Sécuriser les tokens API
+  - [x] Sécuriser les webhooks
+  - [x] Documenter les bonnes pratiques
+
+### 4. CI/CD Docker [✓]
+
+- [x] Pipeline de build
+  - [x] Build automatique de l'image
+  - [x] Tests dans le conteneur
+  - [x] Push sur le registry
+- [x] Déploiement automatique
+  - [x] Pull de la nouvelle image
+  - [x] Redémarrage du conteneur
+  - [x] Vérification de la santé
+- [x] Monitoring
+  - [x] Logs du conteneur
+  - [x] Métriques Docker
+  - [x] Alertes
