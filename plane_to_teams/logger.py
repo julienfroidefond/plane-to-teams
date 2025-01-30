@@ -8,12 +8,15 @@ from pythonjsonlogger import jsonlogger
 
 from plane_to_teams.config import Config
 
-def setup_logging(config: Config) -> None:
+def setup_logging(config: Config) -> logging.Logger:
     """
     Setup application logging.
     
     Args:
         config: Application configuration
+        
+    Returns:
+        logging.Logger: The configured root logger
         
     Raises:
         ValueError: If the log level is invalid
@@ -53,5 +56,6 @@ def setup_logging(config: Config) -> None:
     console_handler.setFormatter(console_formatter)
     root_logger.addHandler(console_handler)
 
-    # Log initial configuration
-    logging.info("Logging configured with level %s", config.log_level) 
+    root_logger.info("Logging configured with level %s", config.log_level)
+
+    return root_logger 
