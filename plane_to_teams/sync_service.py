@@ -130,9 +130,13 @@ class SyncService:
             
         self._save_state()
     
-    async def sync(self):
-        """Effectue la synchronisation si nécessaire."""
-        if not self._should_sync():
+    async def sync(self, force: bool = False):
+        """Effectue la synchronisation si nécessaire.
+        
+        Args:
+            force: Si True, force la synchronisation même si ce n'est pas l'heure
+        """
+        if not force and not self._should_sync():
             logger.info("Pas besoin de synchronisation")
             return
             
