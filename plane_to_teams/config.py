@@ -19,6 +19,7 @@ class Config:
     max_retries: int
     log_level: str
     log_file: str
+    sync_interval: int
 
     @classmethod
     def from_env(cls) -> 'Config':
@@ -34,7 +35,8 @@ class Config:
             notification_hour=int(os.getenv('NOTIFICATION_HOUR', '8')),
             max_retries=int(os.getenv('MAX_RETRIES', '3')),
             log_level=os.getenv('LOG_LEVEL', 'INFO'),
-            log_file=os.getenv('LOG_FILE', 'plane_to_teams.log')
+            log_file=os.getenv('LOG_FILE', 'plane_to_teams.log'),
+            sync_interval=int(os.getenv('SYNC_INTERVAL', '10'))
         )
 
     def validate(self) -> Optional[str]:
@@ -65,5 +67,9 @@ class Config:
         # Check max retries
         if self.max_retries < 1:
             return "Max Retries must be greater than 0"
+
+        # Check sync interval
+        if self.sync_interval < 1:
+            return "Sync Interval must be greater than 0"
 
         return None 
