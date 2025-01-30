@@ -7,10 +7,10 @@ from typing import Dict, List, Tuple
 from plane_to_teams.plane_client import PlaneIssue
 
 PRIORITY_COLORS = {
-    "urgent": "attention",  # Red
-    "high": "warning",      # Orange
-    "medium": "good",       # Green
-    "low": "accent"         # Blue
+    "urgent": "ff0000",  # Red
+    "high": "ffa500",    # Orange
+    "medium": "008000",  # Green
+    "low": "0000ff"      # Blue
 }
 
 STATE_NAMES = {
@@ -45,92 +45,26 @@ class TeamsMessage:
         Returns:
             Dict: The message in Teams format
         """
+        facts = []
+        for i, (priority, name, state, url) in enumerate(self.items):
+            state_name = STATE_NAMES.get(state, "Unknown")
+            color = PRIORITY_COLORS.get(priority.lower(), "000000")
+            
+            facts.append({
+                "name": f"#{i+1}",
+                "value": f"<span style='color:#{color}'>[{priority}]</span> [{name}]({url}) - **{state_name}**"
+            })
+
         return {
-            "type": "message",
-            "attachments": [
-                {
-                    "contentType": "application/vnd.microsoft.card.adaptive",
-                    "content": {
-                        "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
-                        "type": "AdaptiveCard",
-                        "version": "1.2",
-                        "body": [
-                            {
-                                "type": "Container",
-                                "style": "emphasis",
-                                "bleed": True,
-                                "items": [
-                                    {
-                                        "type": "TextBlock",
-                                        "text": "🎯 " + self.title,
-                                        "size": "large",
-                                        "weight": "bolder",
-                                        "color": "accent",
-                                        "horizontalAlignment": "center",
-                                        "spacing": "large",
-                                        "wrap": True
-                                    }
-                                ]
-                            },
-                            {
-                                "type": "Container",
-                                "bleed": True,
-                                "items": [
-                                    {
-                                        "type": "ColumnSet",
-                                        "columns": [
-                                            {
-                                                "type": "Column",
-                                                "width": "50px",
-                                                "items": [
-                                                    {
-                                                        "type": "TextBlock",
-                                                        "text": f"#{i+1}",
-                                                        "color": "accent",
-                                                        "weight": "bolder",
-                                                        "horizontalAlignment": "left"
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                "type": "Column",
-                                                "width": "100px",
-                                                "items": [
-                                                    {
-                                                        "type": "TextBlock",
-                                                        "text": f"[{issue_priority}]",
-                                                        "color": PRIORITY_COLORS.get(issue_priority.lower(), "default"),
-                                                        "weight": "bolder",
-                                                        "horizontalAlignment": "left"
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                "type": "Column",
-                                                "width": "stretch",
-                                                "items": [
-                                                    {
-                                                        "type": "TextBlock",
-                                                        "text": f"{issue_name} (**{STATE_NAMES.get(issue_state, 'Inconnu')}**)",
-                                                        "wrap": True,
-                                                        "horizontalAlignment": "left"
-                                                    }
-                                                ]
-                                            }
-                                        ],
-                                        "spacing": "medium",
-                                        "selectAction": {
-                                            "type": "Action.OpenUrl",
-                                            "url": issue_url
-                                        }
-                                    }
-                                    for i, (issue_priority, issue_name, issue_state, issue_url) in enumerate(self.items)
-                                ]
-                            }
-                        ]
-                    }
-                }
-            ]
+            "@type": "MessageCard",
+            "@context": "http://schema.org/extensions",
+            "themeColor": "0076D7",
+            "summary": self.title,
+            "title": "🎯 " + self.title,
+            "sections": [{
+                "facts": facts,
+                "markdown": True
+            }]
         }
 
 def format_issues(issues: List[PlaneIssue]) -> TeamsMessage:
