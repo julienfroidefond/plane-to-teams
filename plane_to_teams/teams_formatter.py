@@ -4,6 +4,7 @@ Teams message formatter for Plane issues.
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
+from plane_to_teams.config import Config
 from plane_to_teams.plane_client import PlaneIssue, PlaneState
 
 PRIORITY_COLORS = {
@@ -48,12 +49,13 @@ class TeamsMessage:
         }
 
 
-def format_issues(issues: List[PlaneIssue], states: List[PlaneState]) -> TeamsMessage:
+def format_issues(issues: List[PlaneIssue], states: List[PlaneState], config: Config) -> TeamsMessage:
     """Format a list of issues into a Teams message.
     
     Args:
         issues: List of issues to format
         states: List of states from Plane API
+        config: Application configuration
         
     Returns:
         TeamsMessage: The formatted message
@@ -87,7 +89,7 @@ def format_issues(issues: List[PlaneIssue], states: List[PlaneState]) -> TeamsMe
             issue.priority.upper(),
             issue.name,
             state_map[issue.state].name,
-            f"https://plane.julienfroidefond.com/jfr/projects/b19ea686-c7fa-467d-92b9-1e6dcbc584b8/issues/{issue.id}"
+            f"https://plane.julienfroidefond.com/{config.plane_workspace}/{config.plane_project_id}/issues/{issue.id}"
         )
         for issue in top_issues
     ]

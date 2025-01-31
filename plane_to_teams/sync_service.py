@@ -149,7 +149,7 @@ class SyncService:
             logging.info("Récupération des issues terminée")
             
             # Formater le message
-            message = format_issues(issues, states)
+            message = format_issues(issues, states, self.plane_client.config)
             logging.info("Formatage du message terminé")
             
             # Envoyer à Teams

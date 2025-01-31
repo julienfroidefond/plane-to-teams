@@ -2,6 +2,7 @@
 from datetime import datetime
 import unittest
 
+from plane_to_teams.config import Config
 from plane_to_teams.plane_client import PlaneIssue, PlaneState
 from plane_to_teams.teams_formatter import TeamsMessage, format_issues
 
@@ -11,6 +12,14 @@ class TestTeamsFormatter(unittest.TestCase):
 
     def setUp(self):
         """Set up test cases."""
+        self.config = Config(
+            plane_api_token="test_token",
+            plane_base_url="http://test.url",
+            plane_workspace="test_workspace",
+            plane_project_id="test_project",
+            teams_webhook_url="http://teams.webhook"
+        )
+        
         self.sample_states = [
             PlaneState(
                 id="state1",
@@ -119,7 +128,7 @@ class TestTeamsFormatter(unittest.TestCase):
 
     def test_format_issues(self):
         """Test formatting issues into Teams message."""
-        message = format_issues(self.sample_issues, self.sample_states)
+        message = format_issues(self.sample_issues, self.sample_states, self.config)
         
         self.assertIsInstance(message, TeamsMessage)
         self.assertEqual(len(message.items), 3)  # Only issues with states in allowed groups
@@ -130,6 +139,8 @@ class TestTeamsFormatter(unittest.TestCase):
         self.assertEqual(name, "Urgent Issue")
         self.assertEqual(state, "En cours")
         self.assertTrue(url.startswith("https://plane.julienfroidefond.com"))
+        self.assertIn(self.config.plane_workspace, url)
+        self.assertIn(self.config.plane_project_id, url)
         
         # Check sorting (urgent en cours, then high a faire, then medium backlog)
         states = [item[2] for item in message.items]
