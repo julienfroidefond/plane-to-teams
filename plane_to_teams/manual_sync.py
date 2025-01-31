@@ -13,17 +13,21 @@ from plane_to_teams.sync_service import SyncService
 
 async def main():
     """Point d'entrée du script."""
+    # Configurer le logging
+    logging.basicConfig(
+        level=logging.INFO,  # Niveau de log en INFO
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    logger = logging.getLogger(__name__)
+    
     # Charger la configuration
     config = Config.from_env()
     
     # Valider la configuration
     error = config.validate()
     if error:
-        print(f"Erreur de configuration: {error}")
+        logger.error(f"Erreur de configuration: {error}")
         return
-    
-    # Configurer le logging
-    logger = setup_logging(config)
     
     # Initialiser les clients
     plane_client = PlaneClient(config)
