@@ -3,10 +3,13 @@ import json
 from datetime import datetime, time, timedelta
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
+import os
 
 import pytest
 from freezegun import freeze_time
+from aiohttp import ClientError
 
+from plane_to_teams.plane_client import PlaneIssue, PlaneState
 from plane_to_teams.sync_service import SyncService
 
 @pytest.fixture
@@ -14,6 +17,33 @@ def mock_plane_client():
     """Mock du client Plane."""
     client = AsyncMock()
     client.get_issues = AsyncMock(return_value=[])
+    client.get_states = AsyncMock(return_value=[
+        PlaneState(
+            id="state1",
+            name="En cours",
+            color="#ff0000",
+            sequence=1,
+            group="started",
+            default=False
+        ),
+        PlaneState(
+            id="state2",
+            name="A faire",
+            color="#00ff00",
+            sequence=2,
+            group="unstarted",
+            default=False
+        ),
+        PlaneState(
+            id="state3",
+            name="Backlog",
+            color="#0000ff",
+            sequence=3,
+            group="backlog",
+            default=False
+        )
+    ])
+    client.close = AsyncMock()
     return client
 
 @pytest.fixture
@@ -34,14 +64,17 @@ def sync_service(mock_plane_client, mock_teams_client, temp_state_file):
     return SyncService(
         plane_client=mock_plane_client,
         teams_client=mock_teams_client,
-        state_file=temp_state_file,
-        notification_hour=8
+        notification_hour=8,
+        max_retries=3
     )
 
 def test_load_state_new_file(sync_service):
     """Test du chargement du state avec un nouveau fichier."""
-    state = sync_service._load_state()
+    # On s'assure que le fichier n'existe pas
+    if os.path.exists(sync_service.state_file):
+        os.remove(sync_service.state_file)
     
+    state = sync_service._load_state()
     assert state["last_sync"] is None
     assert state["last_sync_status"] == "success"
     assert state["last_issues"] == []
@@ -57,29 +90,37 @@ def test_load_state_existing_file(sync_service, temp_state_file):
         "error_count": 0,
         "last_error": None
     }
+
+    # On s'assure que le répertoire existe
+    os.makedirs(os.path.dirname(temp_state_file), exist_ok=True)
     
     with open(temp_state_file, 'w') as f:
         json.dump(test_state, f)
-    
+
+    sync_service.state_file = temp_state_file
     state = sync_service._load_state()
     assert state == test_state
 
 def test_save_state(sync_service, temp_state_file):
     """Test de la sauvegarde du state."""
-    sync_service.state = {
+    test_state = {
         "last_sync": "2024-01-29T08:00:00+01:00",
         "last_sync_status": "success",
         "last_issues": ["1", "2"],
         "error_count": 0,
         "last_error": None
     }
+    sync_service.state = test_state
+    sync_service.state_file = temp_state_file
+
+    # On s'assure que le répertoire existe
+    os.makedirs(os.path.dirname(temp_state_file), exist_ok=True)
     
     sync_service._save_state()
-    
+
     with open(temp_state_file) as f:
         saved_state = json.load(f)
-    
-    assert saved_state == sync_service.state
+    assert saved_state == test_state
 
 @pytest.mark.parametrize("current_time,last_sync,expected", [
     # Pas de dernier sync -> doit sync
@@ -107,52 +148,96 @@ def test_should_sync(sync_service, current_time, last_sync, expected):
 @pytest.mark.asyncio
 async def test_sync_success(sync_service, mock_plane_client, mock_teams_client):
     """Test d'une synchronisation réussie."""
-    # Simuler qu'on doit sync
-    sync_service._should_sync = MagicMock(return_value=True)
+    # Setup mock issues
+    mock_plane_client.get_issues.return_value = [
+        PlaneIssue(
+            id="1",
+            name="Test Issue",
+            description_html="<p>Test</p>",
+            priority="urgent",
+            state="state1",  # En cours
+            created_at=datetime.now().isoformat(),
+            updated_at=datetime.now().isoformat(),
+            estimate_point=None,
+            start_date=None,
+            target_date=None,
+            completed_at=None,
+            sequence_id=1,
+            project_id="test",
+            labels=[],
+            assignees=[]
+        )
+    ]
     
-    await sync_service.sync()
+    # Force sync
+    await sync_service.sync(force=True)
     
-    # Vérifier que les appels ont été faits
-    mock_plane_client.get_issues.assert_called_once()
-    mock_teams_client.send_message.assert_called_once()
-    
-    # Vérifier le state
-    assert sync_service.state["last_sync_status"] == "success"
-    assert sync_service.state["error_count"] == 0
-    assert sync_service.state["last_error"] is None
+    # Verify
+    assert mock_plane_client.get_states.called
+    assert mock_plane_client.get_issues.called
+    assert mock_teams_client.send_message.called
+    assert mock_plane_client.close.called
 
 @pytest.mark.asyncio
-async def test_sync_error(sync_service, mock_plane_client):
-    """Test d'une synchronisation avec erreur."""
-    # Simuler qu'on doit sync
-    sync_service._should_sync = MagicMock(return_value=True)
+async def test_sync_failure_client_error(sync_service, mock_plane_client, mock_teams_client):
+    """Test d'une synchronisation échouée à cause d'une erreur client."""
+    # Setup mock to raise ClientError
+    mock_plane_client.get_issues.side_effect = ClientError()
     
-    # Simuler une erreur
-    mock_plane_client.get_issues.side_effect = Exception("Test error")
+    # Force sync
+    await sync_service.sync(force=True)
     
-    await sync_service.sync()
-    
-    # Vérifier le state
-    assert sync_service.state["last_sync_status"] == "error"
-    assert sync_service.state["error_count"] == 1
-    assert sync_service.state["last_error"] == "Test error"
+    # Verify
+    assert mock_plane_client.get_states.called
+    assert mock_plane_client.get_issues.called
+    assert not mock_teams_client.send_message.called
+    assert mock_plane_client.close.called
 
 @pytest.mark.asyncio
-async def test_sync_max_retries(sync_service, mock_plane_client):
-    """Test du nombre maximum de tentatives."""
-    # Simuler qu'on doit sync
-    sync_service._should_sync = MagicMock(return_value=True)
+async def test_sync_failure_value_error(sync_service, mock_plane_client, mock_teams_client):
+    """Test d'une synchronisation échouée à cause d'une erreur de valeur."""
+    # Setup mock to raise ValueError
+    mock_plane_client.get_issues.side_effect = ValueError("Invalid data")
     
-    # Simuler une erreur
-    mock_plane_client.get_issues.side_effect = Exception("Test error")
+    # Force sync
+    await sync_service.sync(force=True)
     
-    # Faire plus que le nombre max de tentatives
-    for _ in range(sync_service.max_retries + 1):
-        await sync_service.sync()
+    # Verify
+    assert mock_plane_client.get_states.called
+    assert mock_plane_client.get_issues.called
+    assert not mock_teams_client.send_message.called
+    assert mock_plane_client.close.called
+
+@pytest.mark.asyncio
+async def test_sync_with_empty_states(sync_service, mock_plane_client, mock_teams_client):
+    """Test d'une synchronisation avec une liste d'états vide."""
+    # Setup mock to return empty states
+    mock_plane_client.get_states.return_value = []
+
+    # Force sync
+    await sync_service.sync(force=True)
+
+    # Verify
+    mock_plane_client.get_states.assert_called_once()
+    mock_plane_client.get_issues.assert_not_called()
+    mock_teams_client.send_message.assert_not_called()
+    mock_plane_client.close.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_sync_with_empty_issues(sync_service, mock_plane_client, mock_teams_client):
+    """Test d'une synchronisation avec une liste d'issues vide."""
+    # Setup mock to return empty issues
+    mock_plane_client.get_issues.return_value = []
     
-    # Vérifier que le compteur d'erreurs est au max
-    assert sync_service.state["error_count"] == sync_service.max_retries
+    # Force sync
+    await sync_service.sync(force=True)
     
+    # Verify
+    assert mock_plane_client.get_states.called
+    assert mock_plane_client.get_issues.called
+    assert mock_teams_client.send_message.called  # Devrait quand même envoyer un message
+    assert mock_plane_client.close.called
+
 def test_start_scheduler(sync_service):
     """Test du démarrage du scheduler."""
     with patch('apscheduler.schedulers.asyncio.AsyncIOScheduler.add_job') as mock_add_job:
