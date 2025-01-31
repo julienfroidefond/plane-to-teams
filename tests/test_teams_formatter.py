@@ -2,21 +2,57 @@
 from datetime import datetime
 import unittest
 
-from plane_to_teams.plane_client import PlaneIssue
-from plane_to_teams.teams_formatter import TeamsMessage, format_issues, STATE_ORDER
+from plane_to_teams.plane_client import PlaneIssue, PlaneState
+from plane_to_teams.teams_formatter import TeamsMessage, format_issues
+
 
 class TestTeamsFormatter(unittest.TestCase):
     """Test cases for Teams formatter."""
 
     def setUp(self):
         """Set up test cases."""
+        self.sample_states = [
+            PlaneState(
+                id="state1",
+                name="En cours",
+                color="#ff0000",
+                sequence=1,
+                group="started",
+                default=False
+            ),
+            PlaneState(
+                id="state2",
+                name="A faire",
+                color="#00ff00",
+                sequence=2,
+                group="unstarted",
+                default=False
+            ),
+            PlaneState(
+                id="state3",
+                name="Backlog",
+                color="#0000ff",
+                sequence=3,
+                group="backlog",
+                default=False
+            ),
+            PlaneState(
+                id="state4",
+                name="Terminé",
+                color="#000000",
+                sequence=4,
+                group="completed",
+                default=False
+            )
+        ]
+        
         self.sample_issues = [
             PlaneIssue(
                 id="1",
                 name="Urgent Issue",
                 description_html="<p>Test</p>",
                 priority="urgent",
-                state="daaf8056-e88d-40ba-b527-d58f3e518059",  # En cours
+                state="state1",  # En cours
                 created_at=datetime.now().isoformat(),
                 updated_at=datetime.now().isoformat(),
                 estimate_point=None,
@@ -33,7 +69,7 @@ class TestTeamsFormatter(unittest.TestCase):
                 name="High Priority Issue",
                 description_html="<p>Test</p>",
                 priority="high",
-                state="9ce312cc-0018-4864-9867-064939dda809",  # A faire
+                state="state2",  # A faire
                 created_at=datetime.now().isoformat(),
                 updated_at=datetime.now().isoformat(),
                 estimate_point=None,
@@ -50,7 +86,7 @@ class TestTeamsFormatter(unittest.TestCase):
                 name="Backlog Issue",
                 description_html="<p>Test</p>",
                 priority="medium",  # Changed from urgent to medium
-                state="318803e3-f0ce-4dbf-b0b4-beb1cfba9e81",  # Backlog
+                state="state3",  # Backlog
                 created_at=datetime.now().isoformat(),
                 updated_at=datetime.now().isoformat(),
                 estimate_point=None,
@@ -64,10 +100,10 @@ class TestTeamsFormatter(unittest.TestCase):
             ),
             PlaneIssue(
                 id="4",
-                name="Archived Issue",
+                name="Completed Issue",
                 description_html="<p>Test</p>",
                 priority="urgent",
-                state="ad3ab555-13e9-4ef5-901d-a64813915722",  # Archivé
+                state="state4",  # Terminé
                 created_at=datetime.now().isoformat(),
                 updated_at=datetime.now().isoformat(),
                 estimate_point=None,
@@ -83,16 +119,16 @@ class TestTeamsFormatter(unittest.TestCase):
 
     def test_format_issues(self):
         """Test formatting issues into Teams message."""
-        message = format_issues(self.sample_issues)
+        message = format_issues(self.sample_issues, self.sample_states)
         
         self.assertIsInstance(message, TeamsMessage)
-        self.assertEqual(len(message.items), 3)  # Only issues with states in STATE_ORDER
+        self.assertEqual(len(message.items), 3)  # Only issues with states in allowed groups
         
         # Check first item (urgent + en cours)
         priority, name, state, url = message.items[0]
         self.assertEqual(priority, "URGENT")
         self.assertEqual(name, "Urgent Issue")
-        self.assertEqual(state, "daaf8056-e88d-40ba-b527-d58f3e518059")
+        self.assertEqual(state, "En cours")
         self.assertTrue(url.startswith("https://plane.julienfroidefond.com"))
         
         # Check sorting (urgent en cours, then high a faire, then medium backlog)
@@ -100,9 +136,9 @@ class TestTeamsFormatter(unittest.TestCase):
         self.assertEqual(
             states,
             [
-                "daaf8056-e88d-40ba-b527-d58f3e518059",  # En cours
-                "9ce312cc-0018-4864-9867-064939dda809",  # A faire
-                "318803e3-f0ce-4dbf-b0b4-beb1cfba9e81",  # Backlog
+                "En cours",  # state1
+                "A faire",   # state2
+                "Backlog"    # state3
             ]
         )
         
@@ -118,7 +154,7 @@ class TestTeamsFormatter(unittest.TestCase):
         message = TeamsMessage(
             title="Test Title",
             items=[
-                ("URGENT", "Test Issue", "daaf8056-e88d-40ba-b527-d58f3e518059", "https://test.com/1")
+                ("URGENT", "Test Issue", "En cours", "https://test.com/1")
             ]
         )
 

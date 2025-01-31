@@ -4,32 +4,13 @@ Teams message formatter for Plane issues.
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
-from plane_to_teams.plane_client import PlaneIssue
+from plane_to_teams.plane_client import PlaneIssue, PlaneState
 
 PRIORITY_COLORS = {
     "urgent": "ff0000",  # Red
     "high": "ffa500",    # Orange
     "medium": "008000",  # Green
     "low": "0000ff"      # Blue
-}
-
-STATE_NAMES = {
-    "daaf8056-e88d-40ba-b527-d58f3e518059": "En cours",
-    "9ce312cc-0018-4864-9867-064939dda809": "A faire",
-    "6c15d246-3feb-4030-aa58-e1b98cd05b17": "En attente",
-    "1d3cdf89-0efd-45ec-a50c-2b8c56db6344": "Bloqué",
-    "a591fadc-7f1b-49c2-9ccd-43f50451e415": "En revue",
-    "20df7a00-c8f5-4ae4-b9a3-8726946129b1": "A valider",
-    "318803e3-f0ce-4dbf-b0b4-beb1cfba9e81": "Backlog",
-    "ad3ab555-13e9-4ef5-901d-a64813915722": "Archivé",
-    "e0b22f89-691a-4f4c-9083-3c860cb0255a": "Terminé"
-}
-
-# Map states to sort order
-STATE_ORDER = {
-    "daaf8056-e88d-40ba-b527-d58f3e518059": 0,  # En cours
-    "9ce312cc-0018-4864-9867-064939dda809": 1,  # A faire
-    "318803e3-f0ce-4dbf-b0b4-beb1cfba9e81": 2,  # Backlog
 }
 
 @dataclass
@@ -47,12 +28,11 @@ class TeamsMessage:
         """
         facts = []
         for i, (priority, name, state, url) in enumerate(self.items):
-            state_name = STATE_NAMES.get(state, "Unknown")
             color = PRIORITY_COLORS.get(priority.lower(), "000000")
             
             facts.append({
                 "name": f"#{i+1}",
-                "value": f"<span style='color:#{color}'>[{priority}]</span> [{name}]({url}) - **{state_name}**"
+                "value": f"<span style='color:#{color}'>[{priority}]</span> [{name}]({url}) - **{state}**"
             })
 
         return {
@@ -67,22 +47,27 @@ class TeamsMessage:
             }]
         }
 
-def format_issues(issues: List[PlaneIssue]) -> TeamsMessage:
+
+def format_issues(issues: List[PlaneIssue], states: List[PlaneState]) -> TeamsMessage:
     """Format a list of issues into a Teams message.
     
     Args:
         issues: List of issues to format
+        states: List of states from Plane API
         
     Returns:
         TeamsMessage: The formatted message
     """
-    # Filter issues by state (only keep En cours, A faire, Backlog)
+    # Create a map of state IDs to state objects
+    state_map = {state.id: state for state in states}
+    
+    # Filter issues by state group (only keep backlog, unstarted, started)
     filtered_issues = [
         issue for issue in issues 
-        if issue.state in STATE_ORDER.keys()
+        if state_map[issue.state].group in ['backlog', 'unstarted', 'started']
     ]
     
-    # Sort by priority first, then by state
+    # Sort by priority first, then by state sequence
     filtered_issues.sort(key=lambda x: (
         {
             "urgent": 0,
@@ -90,7 +75,7 @@ def format_issues(issues: List[PlaneIssue]) -> TeamsMessage:
             "medium": 2,
             "low": 3
         }.get(x.priority, 4),
-        STATE_ORDER.get(x.state, 99)
+        state_map[x.state].sequence
     ))
     
     # Take top 10 issues
@@ -101,7 +86,7 @@ def format_issues(issues: List[PlaneIssue]) -> TeamsMessage:
         (
             issue.priority.upper(),
             issue.name,
-            issue.state,
+            state_map[issue.state].name,
             f"https://plane.julienfroidefond.com/workspace/jfr/projects/b19ea686-c7fa-467d-92b9-1e6dcbc584b8/issues/{issue.id}"
         )
         for issue in top_issues
