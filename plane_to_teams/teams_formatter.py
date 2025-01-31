@@ -89,7 +89,7 @@ def format_issues(issues: List[PlaneIssue], states: List[PlaneState], config: Co
             issue.priority.upper(),
             issue.name,
             state_map[issue.state].name,
-            f"https://plane.julienfroidefond.com/{config.plane_workspace}/{config.plane_project_id}/issues/{issue.id}"
+            f"https://plane.julienfroidefond.com/{config.plane_workspace}/projects/{config.plane_project_id}/issues/{issue.id}"
         )
         for issue in top_issues
     ]
