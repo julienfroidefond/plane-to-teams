@@ -87,7 +87,7 @@ def format_issues(issues: List[PlaneIssue], states: List[PlaneState]) -> TeamsMe
             issue.priority.upper(),
             issue.name,
             state_map[issue.state].name,
-            f"https://plane.julienfroidefond.com/workspace/jfr/projects/b19ea686-c7fa-467d-92b9-1e6dcbc584b8/issues/{issue.id}"
+            f"https://plane.julienfroidefond.com/jfr/projects/b19ea686-c7fa-467d-92b9-1e6dcbc584b8/issues/{issue.id}"
         )
         for issue in top_issues
     ]
