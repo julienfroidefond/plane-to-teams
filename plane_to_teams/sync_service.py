@@ -131,41 +131,43 @@ class SyncService:
         self._save_state()
     
     async def sync(self, force: bool = False):
-        """Effectue la synchronisation si nécessaire.
-        
-        Args:
-            force: Si True, force la synchronisation même si ce n'est pas l'heure
-        """
-        if not force and not self._should_sync():
-            logger.info("Pas besoin de synchronisation")
-            return
-            
-        # Si on a atteint le nombre max de tentatives, on arrête
-        if self.state["error_count"] >= self.max_retries:
-            logger.error("Nombre maximum de tentatives atteint")
-            return
-            
-        logger.info("Début de la synchronisation")
-        
+        """Synchronise les issues de Plane vers Teams."""
         try:
-            # Récupérer les issues
+            logging.info("Début de la synchronisation")
+
+            # Récupération des states
+            states = await self.plane_client.get_states()
+            logging.info("Récupération des states terminée")
+
+            # Si pas d'états, on arrête là
+            if not states:
+                logging.info("Pas d'états à synchroniser")
+                return
+
+            # Récupération des issues
             issues = await self.plane_client.get_issues()
+            logging.info("Récupération des issues terminée")
             
             # Formater le message
-            message = format_issues(issues)
+            message = format_issues(issues, states)
+            logging.info("Formatage du message terminé")
             
             # Envoyer à Teams
             await self.teams_client.send_message(message)
+            logging.info("Envoi du message Teams terminé")
             
             # Mettre à jour le state
             self._update_state(True, issues=issues)
             
-            logger.info("Synchronisation terminée avec succès")
+            logging.info("Synchronisation terminée avec succès")
             
         except Exception as e:
             error_msg = str(e)
-            logger.error(f"Erreur lors de la synchronisation: {error_msg}")
+            logging.error(f"Erreur lors de la synchronisation: {error_msg}")
             self._update_state(False, error=error_msg)
+        finally:
+            # Fermer la session du client Plane
+            await self.plane_client.close()
     
     def start(self):
         """Démarre le service de synchronisation."""
@@ -178,13 +180,13 @@ class SyncService:
         
         # Si on démarre après l'heure de notif et qu'on n'a pas encore sync aujourd'hui
         if self._should_sync():
-            logger.info("Démarrage après l'heure de notification, tentative de sync immédiate")
+            logging.info("Démarrage après l'heure de notification, tentative de sync immédiate")
             self.scheduler.add_job(self.sync, 'date')
         
         self.scheduler.start()
-        logger.info("Service de synchronisation démarré")
+        logging.info("Service de synchronisation démarré")
     
     def stop(self):
         """Arrête le service de synchronisation."""
         self.scheduler.shutdown()
-        logger.info("Service de synchronisation arrêté") 
+        logging.info("Service de synchronisation arrêté") 
