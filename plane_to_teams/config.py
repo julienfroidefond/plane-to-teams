@@ -2,7 +2,7 @@
 Configuration management for the application.
 """
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 from dotenv import load_dotenv
@@ -15,11 +15,11 @@ class Config:
     plane_workspace: str
     plane_project_id: str
     teams_webhook_url: str
-    notification_hour: int
-    max_retries: int
-    log_level: str
-    log_file: str
-    sync_interval: int
+    notification_hour: int = field(default=8)
+    max_retries: int = field(default=3)
+    log_level: str = field(default="INFO")
+    log_file: str = field(default="plane_to_teams.log")
+    sync_interval: int = field(default=10)
 
     @classmethod
     def from_env(cls) -> 'Config':
